@@ -31,6 +31,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+#include <hermit/misc.h>
+#include <hermit/syscall.h>
 
 #define N	255
 
@@ -47,7 +49,17 @@ int main(int argc, char** argv)
 	// register test handler
 	signal(SIGUSR1, test_handler);
 
-	printf("Hello World!!!\n");
+	printf("Hello %d \n", just_a_flag);
+//	reinitd();
+	sys_msleep(1000*10);
+	printf("World!! \n");
+	sys_msleep(1000*10);
+
+	for(i=20; i>0; i--)	
+		printf("World!! %d \n", i);
+
+
+
 	//for(i=0; environ[i]; i++)
 	//	printf("environ[%d] = %s\n", i, environ[i]);
 	for(i=0; i<argc; i++)
@@ -68,7 +80,8 @@ int main(int argc, char** argv)
 	file = fopen("/tmp/test.txt", "w");
 	if (file)
 	{
-		fprintf(file, "Hello World!!!\n");
+		fprintf(file, "Hello \n");
+		fprintf(file, "World!! \n");
 		fclose(file);
 	} else fprintf(stderr, "Unable to open file /tmp/test.txt\n");
 

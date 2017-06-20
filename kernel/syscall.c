@@ -43,6 +43,7 @@
 #include <lwip/sockets.h>
 #include <lwip/err.h>
 #include <lwip/stats.h>
+#include <hermit/misc.h>
 
 /*
  * Note that linker symbols are not variables, they have no memory allocated for
@@ -129,7 +130,7 @@ typedef struct {
 	ssize_t ret;
 } __attribute__((packed)) uhyve_read_t;
 
-ssize_t sys_read(int fd, char* buf, size_t len)
+ssize_t hermit_sys_read(int fd, char* buf, size_t len)
 {
 	if (is_uhyve()) {
                 uhyve_read_t uhyve_args = {fd, (char*) virt_to_phys((size_t) buf), len, -1};
@@ -138,6 +139,8 @@ ssize_t sys_read(int fd, char* buf, size_t len)
 
                 return uhyve_args.ret;
         }
+
+	LOG_INFO("Inside hermit lwip read\n");
 
 	sys_read_t sysargs = {__NR_read, fd, len};
 	ssize_t j, ret;
@@ -183,6 +186,15 @@ ssize_t sys_read(int fd, char* buf, size_t len)
 	return j;
 }
 
+ssize_t sys_read(int fd, char* buf, size_t len)
+{
+	int ret;
+
+	while((ret = hermit_sys_read(fd, buf, len))<0)
+		reinitd();
+
+	return ret;
+}
 ssize_t readv(int d, const struct iovec *iov, int iovcnt)
 {
 	return -ENOSYS;
@@ -200,7 +212,7 @@ typedef struct {
 	size_t len;
 } __attribute__((packed)) uhyve_write_t;
 
-ssize_t sys_write(int fd, const char* buf, size_t len)
+ssize_t hermit_sys_write(int fd, const char* buf, size_t len)
 {
 	if (BUILTIN_EXPECT(!buf, 0))
 		return -1;
@@ -212,7 +224,7 @@ ssize_t sys_write(int fd, const char* buf, size_t len)
 
 		return uhyve_args.len;
 	}
-
+	LOG_ERROR("Inside hermit lwip write\n");
 	ssize_t i, ret;
 	int s;
 	sys_write_t sysargs = {__NR_write, fd, len};
@@ -263,6 +275,14 @@ ssize_t sys_write(int fd, const char* buf, size_t len)
 	spinlock_irqsave_unlock(&lwip_lock);
 
 	return i;
+}
+
+ssize_t sys_write(int fd, const char* buf, size_t len)
+{
+	int ret;
+	while((ret = hermit_sys_write(fd, buf, len)) < 0)
+		reinitd();
+	return ret;
 }
 
 ssize_t writev(int fildes, const struct iovec *iov, int iovcnt)

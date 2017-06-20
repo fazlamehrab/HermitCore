@@ -209,9 +209,9 @@ static int env_init(char *path)
 	if (monitor == QEMU) {
 		atexit(qemu_fini);
 		return qemu_init(path);
-/*	} else if (monitor == UHYVE) {
+	} else if (monitor == UHYVE) {
 		return uhyve_init(path);
-*/	} else {
+	} else {
 		atexit(multi_fini);
 		return multi_init(path);
 	}
@@ -1044,9 +1044,9 @@ int main(int argc, char **argv)
 	ret = env_init(argv[1]);
 	if (ret)
 		return ret;
-	while(1);
 
-/*	switch(monitor) {
+
+	switch(monitor) {
 	case UHYVE:
 		return uhyve_loop();
 
@@ -1059,5 +1059,4 @@ int main(int argc, char **argv)
 	}
 
 	return 1;
-*/
 }

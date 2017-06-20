@@ -60,6 +60,7 @@
 #include <net/rtl8139.h>
 #include <net/e1000.h>
 #include <net/vioif.h>
+#include <hermit/misc.h>
 
 #define HERMIT_PORT	0x494E
 #define HERMIT_MAGIC	0x7E317
@@ -369,7 +370,7 @@ int libc_start(int argc, char** argv, char** env);
 // init task => creates all other tasks an initialize the LwIP
 static int initd(void* arg)
 {
-	int s = -1, c = -1;
+	int c = -1;
 	int i, j, flag;
 	int len, err;
 	int magic = 0;
@@ -377,8 +378,8 @@ static int initd(void* arg)
 	task_t* curr_task = per_core(current_task);
 	size_t heap = HEAP_START;
 	int argc, envc;
-	char** argv = NULL;
-	char **environ = NULL;
+	//char** argv = NULL;
+	//char **environ = NULL;
 
 	LOG_INFO("Initd is running\n");
 
@@ -424,8 +425,8 @@ static int initd(void* arg)
 	if (!is_single_kernel())
 		init_rcce();
 
-	s = lwip_socket(AF_INET6, SOCK_STREAM , 0);
-	if (s < 0) {
+	soc = lwip_socket(AF_INET6, SOCK_STREAM , 0);
+	if (soc < 0) {
 		LOG_ERROR("socket failed: %d\n", server);
 		return -1;
 	}
@@ -436,17 +437,17 @@ static int initd(void* arg)
 	server.sin6_addr = in6addr_any;
 	server.sin6_port = htons(HERMIT_PORT);
 
-	if ((err = lwip_bind(s, (struct sockaddr *) &server, sizeof(server))) < 0)
+	if ((err = lwip_bind(soc, (struct sockaddr *) &server, sizeof(server))) < 0)
 	{
 		LOG_ERROR("bind failed: %d\n", errno);
-		lwip_close(s);
+		lwip_close(soc);
 		return -1;
 	}
 
-	if ((err = lwip_listen(s, 2)) < 0)
+	if ((err = lwip_listen(soc, 2)) < 0)
 	{
 		LOG_ERROR("listen failed: %d\n", errno);
-		lwip_close(s);
+		lwip_close(soc);
 		return -1;
 	}
 
@@ -455,10 +456,10 @@ static int initd(void* arg)
 	LOG_INFO("Boot time: %d ms\n", (get_clock_tick() * 1000) / TIMER_FREQ);
 	LOG_INFO("TCP server is listening.\n");
 
-	if ((c = lwip_accept(s, (struct sockaddr *)&client, (socklen_t*)&len)) < 0)
+	if ((c = lwip_accept(soc, (struct sockaddr *)&client, (socklen_t*)&len)) < 0)
 	{
 		LOG_ERROR("accept faild: %d\n", errno);
-		lwip_close(s);
+		lwip_close(soc);
 		return -1;
 	}
 
@@ -467,9 +468,9 @@ static int initd(void* arg)
 	lwip_setsockopt(c, SOL_SOCKET, SO_RCVBUF, (char *) &sobufsize, sizeof(sobufsize));
 	lwip_setsockopt(c, SOL_SOCKET, SO_SNDBUF, (char *) &sobufsize, sizeof(sobufsize));
 	flag = 1;
-	lwip_setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(flag));
+	lwip_setsockopt(soc, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(flag));
 	flag = 0;
-	lwip_setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(flag));
+	lwip_setsockopt(soc, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(flag));
 
 	magic = 0;
 	lwip_read(c, &magic, sizeof(magic));
@@ -484,10 +485,10 @@ static int initd(void* arg)
 	if (err != sizeof(argc))
 		goto out;
 
-	argv = kmalloc((argc+1)*sizeof(char*));
-	if (!argv)
+	cargv = kmalloc((argc+1)*sizeof(char*));
+	if (!cargv)
 		goto out;
-	memset(argv, 0x00, (argc+1)*sizeof(char*));
+	memset(cargv, 0x00, (argc+1)*sizeof(char*));
 
 	for(i=0; i<argc; i++)
 	{
@@ -495,13 +496,13 @@ static int initd(void* arg)
 		if (err != sizeof(len))
 			goto out;
 
-		argv[i] = kmalloc(len);
-		if (!argv[i])
+		cargv[i] = kmalloc(len);
+		if (!cargv[i])
 			goto out;
 
 		j = 0;
 		while(j < len) {
-			err = lwip_read(c, argv[i]+j, len-j);
+			err = lwip_read(c, cargv[i]+j, len-j);
 			if (err < 0)
 				goto out;
 			j += err;
@@ -513,10 +514,10 @@ static int initd(void* arg)
 	if (err != sizeof(envc))
 		goto out;
 
-	environ = kmalloc((envc+1)*sizeof(char**));
-	if (!environ)
+	cenviron = kmalloc((envc+1)*sizeof(char**));
+	if (!cenviron)
 		goto out;
-	memset(environ, 0x00, (envc+1)*sizeof(char*));
+	memset(cenviron, 0x00, (envc+1)*sizeof(char*));
 
 	for(i=0; i<envc; i++)
 	{
@@ -524,13 +525,13 @@ static int initd(void* arg)
 		if (err != sizeof(len))
 			goto out;
 
-		environ[i] = kmalloc(len);
-		if (!environ[i])
+		cenviron[i] = kmalloc(len);
+		if (!cenviron[i])
 			goto out;
 
 		j = 0;
 		while(j < len) {
-			err = lwip_read(c, environ[i]+j, len-j);
+			err = lwip_read(c, cenviron[i]+j, len-j);
 			if (err < 0)
 				goto out;
 			j += err;
@@ -539,34 +540,34 @@ static int initd(void* arg)
 
 	// call user code
 	libc_sd = c;
-	libc_start(argc, argv, environ);
+	libc_start(argc, cargv, cenviron);
 
 out:
-	if (argv) {
+	if (cargv) {
 		for(i=0; i<argc; i++) {
-			if (argv[i])
-				kfree(argv[i]);
+			if (cargv[i])
+				kfree(cargv[i]);
 		}
 
-		kfree(argv);
+		kfree(cargv);
 	}
 
-	if (environ) {
+	if (cenviron) {
 		i = 0;
-		while(environ[i]) {
-			kfree(environ[i]);
+		while(cenviron[i]) {
+			kfree(cenviron[i]);
 			i++;
 		}
 
-		kfree(environ);
+		kfree(cenviron);
 	}
 
 	if (c > 0)
 		lwip_close(c);
 	libc_sd = -1;
 
-	if (s > 0)
-		lwip_close(s);
+	if (soc > 0)
+		lwip_close(soc);
 
 	return 0;
 }

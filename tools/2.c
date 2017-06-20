@@ -1041,15 +1041,16 @@ int main(int argc, char **argv)
 {
 	int ret;
 
-	ret = env_init(argv[1]);
+/*	ret = env_init(argv[1]);
 	if (ret)
 		return ret;
-	while(1);
+*/
+	monitor = QEMU;
 
-/*	switch(monitor) {
-	case UHYVE:
+	switch(monitor) {
+/*	case UHYVE:
 		return uhyve_loop();
-
+*/
 	case BAREMETAL:
 	case QEMU:
 		return socket_loop(argc, argv);
@@ -1059,5 +1060,4 @@ int main(int argc, char **argv)
 	}
 
 	return 1;
-*/
 }
