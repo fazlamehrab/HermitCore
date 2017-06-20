@@ -36,7 +36,5 @@ static char **cenviron = NULL;
 static int just_a_flag = -1;
 
 int reinitd();
-int hermit_lwip_write(int s, const void *data, size_t size);
-int hermit_lwip_read(int s, void *mem, size_t len);
 
 #endif

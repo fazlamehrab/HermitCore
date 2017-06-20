@@ -41,47 +41,6 @@
 
 static const int sobufsize = 131072;
 
-int hermit_lwip_write(int s, const void *data, size_t size)
-{
-	int ret;
-
-	LOG_INFO("Inside hermit lwip wirte\n");
-	ret = lwip_write(s, data, size);
-	LOG_INFO("RET = %d\n", ret);
-	if(ret < 0)
-	{
-		LOG_INFO("Re-Initializing\n");
-		reinitd();
-		s = libc_sd;
-		while((ret = lwip_write(s, data, size))<0);
-		LOG_INFO("After a while RET = %d\n", ret);
-	}
-	
-	just_a_flag = 2;
-
-	return ret;
-}
-
-int hermit_lwip_read(int s, void *mem, size_t len)
-{
-	int ret;
-
-	LOG_INFO("Inside hermit lwip read\n");
-	ret = lwip_read(s, mem, len);
-	LOG_INFO("RET = %d\n", ret);
-	if(ret < 0)
-	{
-		LOG_INFO("Re-Initializing\n");
-		reinitd();
-		s = libc_sd;
-		ret = lwip_read(s, mem, len);
-	}
-	
-	just_a_flag = 1;
-
-	return ret;
-}
-
 int reinitd()
 {
 	int c = -1;
