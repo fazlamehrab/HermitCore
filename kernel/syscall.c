@@ -99,8 +99,11 @@ void NORETURN sys_exit(int arg)
 		if (libc_sd >= 0)
 		{
 			int s = libc_sd;
+			
+			//modified by mehrab
+			while(lwip_write(s, &sysargs, sizeof(sysargs))<0)
+				reinitd();
 
-			lwip_write(s, &sysargs, sizeof(sysargs));
 			libc_sd = -1;
 
 			spinlock_irqsave_unlock(&lwip_lock);
@@ -140,7 +143,7 @@ ssize_t hermit_sys_read(int fd, char* buf, size_t len)
                 return uhyve_args.ret;
         }
 
-	LOG_INFO("Inside hermit lwip read\n");
+	//LOG_INFO("Inside hermit lwip read\n");
 
 	sys_read_t sysargs = {__NR_read, fd, len};
 	ssize_t j, ret;
@@ -189,12 +192,13 @@ ssize_t hermit_sys_read(int fd, char* buf, size_t len)
 ssize_t sys_read(int fd, char* buf, size_t len)
 {
 	int ret;
-
+LOG_INFO("Inside hermit sys read\n");
 	while((ret = hermit_sys_read(fd, buf, len))<0)
 		reinitd();
 
 	return ret;
 }
+
 ssize_t readv(int d, const struct iovec *iov, int iovcnt)
 {
 	return -ENOSYS;
@@ -224,7 +228,7 @@ ssize_t hermit_sys_write(int fd, const char* buf, size_t len)
 
 		return uhyve_args.len;
 	}
-	LOG_ERROR("Inside hermit lwip write\n");
+	//LOG_ERROR("Inside hermit lwip write\n");
 	ssize_t i, ret;
 	int s;
 	sys_write_t sysargs = {__NR_write, fd, len};
@@ -280,6 +284,7 @@ ssize_t hermit_sys_write(int fd, const char* buf, size_t len)
 ssize_t sys_write(int fd, const char* buf, size_t len)
 {
 	int ret;
+LOG_INFO("Inside hermit sys write\n");
 	while((ret = hermit_sys_write(fd, buf, len)) < 0)
 		reinitd();
 	return ret;
@@ -333,7 +338,7 @@ typedef struct {
 	int ret;
 } __attribute__((packed)) uhyve_open_t;
 
-int sys_open(const char* name, int flags, int mode)
+int hermit_sys_open(const char* name, int flags, int mode)
 {
 	if (is_uhyve()) {
 		uhyve_open_t uhyve_open = {(const char*)virt_to_phys((size_t)name), flags, mode, -1};
@@ -394,6 +399,17 @@ out:
 	return ret;
 }
 
+
+int sys_open(const char* name, int flags, int mode)
+{
+	int ret;
+LOG_INFO("sys_open\n");
+	while((ret = hermit_sys_open(name, flags, mode)) < 0)
+		reinitd();
+
+	return ret;
+}
+
 typedef struct {
 	int sysnr;
 	int fd;
@@ -404,7 +420,7 @@ typedef struct {
         int ret;
 } __attribute__((packed)) uhyve_close_t;
 
-int sys_close(int fd)
+int hermit_sys_close(int fd)
 {
 	if (is_uhyve()) {
 		uhyve_close_t uhyve_close = {fd, -1};
@@ -440,6 +456,16 @@ int sys_close(int fd)
 
 out:
 	spinlock_irqsave_unlock(&lwip_lock);
+
+	return ret;
+}
+
+int sys_close(int fd)
+{
+	int ret;
+LOG_INFO("sys_close\n");
+	while((ret = hermit_sys_close(fd)) < 0)
+		reinitd();
 
 	return ret;
 }
@@ -595,7 +621,7 @@ off_t sys_lseek(int fd, off_t offset, int whence)
 
 		return uhyve_lseek.offset;
 	}
-
+LOG_INFO("sys_lseek\n");
 	off_t off;
 	sys_lseek_t sysargs = {__NR_lseek, fd, offset, whence};
 	int s;
@@ -615,6 +641,7 @@ off_t sys_lseek(int fd, off_t offset, int whence)
 
 	return off;
 }
+
 
 int sys_rcce_init(int session_id)
 {

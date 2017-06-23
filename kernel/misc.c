@@ -196,8 +196,3 @@ out:
 
 	return 0;
 }
-
-int sample()
-{
-	return 5;
-}

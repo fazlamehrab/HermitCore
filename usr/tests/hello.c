@@ -52,8 +52,6 @@ int main(int argc, char** argv)
 	printf("Hello %d \n", just_a_flag);
 //	reinitd();
 	sys_msleep(1000*10);
-	printf("World!! \n");
-	sys_msleep(1000*10);
 
 	for(i=20; i>0; i--)	
 		printf("World!! %d \n", i);
